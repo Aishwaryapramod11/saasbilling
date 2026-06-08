@@ -1,11 +1,11 @@
-import { sequelize, User, Card, Invoice, AuditLog, PlanLimit } from './db.js';
+import { sequelize, Organization, User, Card, Invoice, AuditLog, PlanLimit } from './db.js';
 import bcrypt from 'bcryptjs';
 
 const seed = async () => {
   try {
-    console.log('Seeding SQLite database...');
-    await sequelize.sync({ force: true }); // Reset database tables
-    console.log('Database synced. Creating records...');
+    console.log('Seeding SQLite database with Organization model...');
+    await sequelize.sync({ force: true }); // Reset tables
+    console.log('Database synced. Seeding records...');
 
     // 1. Seed Plan Limits
     const defaultPlans = [
@@ -16,16 +16,9 @@ const seed = async () => {
     await PlanLimit.bulkCreate(defaultPlans);
     console.log('Plan limits seeded.');
 
-    // 2. Hash Passwords
-    const adminPassword = await bcrypt.hash('admin123', 10);
-    const managerPassword = await bcrypt.hash('manager123', 10);
-    const viewerPassword = await bcrypt.hash('viewer123', 10);
-
-    // 3. Create Users
-    const adminUser = await User.create({
-      email: 'admin@streamify.com',
-      password: adminPassword,
-      role: 'admin',
+    // 2. Create Shared Organization
+    const sharedOrg = await Organization.create({
+      name: 'Streamify Shared Workspace',
       plan: 'Standard (HD)',
       billingCycle: 'monthly',
       subStatus: 'active',
@@ -34,36 +27,38 @@ const seed = async () => {
       hoursStreamed: 120,
       yearlyDiscount: 20
     });
+    console.log('Shared Organization created.');
+
+    // 3. Hash Passwords
+    const adminPassword = await bcrypt.hash('admin123', 10);
+    const managerPassword = await bcrypt.hash('manager123', 10);
+    const viewerPassword = await bcrypt.hash('viewer123', 10);
+
+    // 4. Create Users under the SAME email but DIFFERENT roles and passwords
+    const adminUser = await User.create({
+      email: 'user@streamify.com',
+      password: adminPassword,
+      role: 'admin',
+      OrganizationId: sharedOrg.id
+    });
 
     const managerUser = await User.create({
-      email: 'manager@streamify.com',
+      email: 'user@streamify.com',
       password: managerPassword,
       role: 'billing_manager',
-      plan: 'Basic (Ads)',
-      billingCycle: 'monthly',
-      subStatus: 'active',
-      seats: 1,
-      downloads: 0,
-      hoursStreamed: 10,
-      yearlyDiscount: 20
+      OrganizationId: sharedOrg.id
     });
 
     const viewerUser = await User.create({
-      email: 'viewer@streamify.com',
+      email: 'user@streamify.com',
       password: viewerPassword,
       role: 'viewer',
-      plan: 'Premium (4K)',
-      billingCycle: 'yearly',
-      subStatus: 'active',
-      seats: 5,
-      downloads: 85,
-      hoursStreamed: 210,
-      yearlyDiscount: 20
+      OrganizationId: sharedOrg.id
     });
 
-    console.log('Users seeded successfully (admin, manager, viewer).');
+    console.log('Users created with email user@streamify.com (Admin, Manager, Viewer).');
 
-    // 4. Create Credit Cards
+    // 5. Seed Credit Card (shared at organization level)
     await Card.create({
       id: 'c1',
       brand: 'Visa',
@@ -72,79 +67,36 @@ const seed = async () => {
       expYear: 2028,
       cardholder: 'Aishwarya R',
       isDefault: true,
-      UserId: adminUser.id
+      OrganizationId: sharedOrg.id
     });
 
-    await Card.create({
-      id: 'c2',
-      brand: 'Mastercard',
-      last4: '9876',
-      expMonth: 8,
-      expYear: 2027,
-      cardholder: 'Manager User',
-      isDefault: true,
-      UserId: managerUser.id
-    });
+    console.log('Shared Organization payment cards seeded.');
 
-    await Card.create({
-      id: 'c3',
-      brand: 'Amex',
-      last4: '8431',
-      expMonth: 5,
-      expYear: 2029,
-      cardholder: 'Viewer User',
-      isDefault: true,
-      UserId: viewerUser.id
-    });
-
-    console.log('Payment cards seeded.');
-
-    // 5. Create Invoices
-    const adminInvoices = [
-      { id: 'INV-1092', date: '2026-04-08', plan: 'Basic (Ads) Plan', amount: 5.99, status: 'Paid', method: 'Visa ending in 4242', UserId: adminUser.id },
-      { id: 'INV-2041', date: '2026-05-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242', UserId: adminUser.id },
-      { id: 'INV-3184', date: '2026-06-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242', UserId: adminUser.id }
+    // 6. Seed Invoices (shared at organization level)
+    const orgInvoices = [
+      { id: 'INV-1092', date: '2026-04-08', plan: 'Basic (Ads) Plan', amount: 5.99, status: 'Paid', method: 'Visa ending in 4242', OrganizationId: sharedOrg.id },
+      { id: 'INV-2041', date: '2026-05-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242', OrganizationId: sharedOrg.id },
+      { id: 'INV-3184', date: '2026-06-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242', OrganizationId: sharedOrg.id }
     ];
-    await Invoice.bulkCreate(adminInvoices);
+    await Invoice.bulkCreate(orgInvoices);
+    console.log('Shared Organization invoices seeded.');
 
-    const managerInvoices = [
-      { id: 'INV-5011', date: '2026-06-01', plan: 'Basic (Ads) Plan', amount: 5.99, status: 'Paid', method: 'Mastercard ending in 9876', UserId: managerUser.id }
-    ];
-    await Invoice.bulkCreate(managerInvoices);
-
-    const viewerInvoices = [
-      { id: 'INV-7023', date: '2026-01-01', plan: 'Premium (4K) Plan (Yearly)', amount: 220.70, status: 'Paid', method: 'Amex ending in 8431', UserId: viewerUser.id }
-    ];
-    await Invoice.bulkCreate(viewerInvoices);
-
-    console.log('Invoices seeded.');
-
-    // 6. Create Audit Logs
+    // 7. Seed Audit Logs (linked to organization and mapped to actors)
     await AuditLog.create({
       time: new Date().toLocaleTimeString(),
-      message: 'System: SQLite Database initialized.',
+      message: 'System: SQLite Shared Database initialized.',
+      OrganizationId: sharedOrg.id,
       UserId: adminUser.id
     });
     await AuditLog.create({
       time: new Date().toLocaleTimeString(),
-      message: 'Streaming: Subscription active on Standard (HD) tier.',
+      message: 'Streaming: Subscription plan set to Standard (HD).',
+      OrganizationId: sharedOrg.id,
       UserId: adminUser.id
-    });
-
-    await AuditLog.create({
-      time: new Date().toLocaleTimeString(),
-      message: 'System: SQLite Database initialized.',
-      UserId: managerUser.id
-    });
-
-    await AuditLog.create({
-      time: new Date().toLocaleTimeString(),
-      message: 'System: SQLite Database initialized.',
-      UserId: viewerUser.id
     });
 
     console.log('Audit logs seeded.');
-    console.log('SQLite Seeding Completed Successfully.');
+    console.log('SQLite seeding successfully finished.');
     process.exit(0);
   } catch (error) {
     console.error('Seeding Error:', error);

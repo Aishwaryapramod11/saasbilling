@@ -13,26 +13,17 @@ export const sequelize = new Sequelize({
 
 // --- MODELS ---
 
-// 1. User Model
-export const User = sequelize.define('User', {
+// 1. Organization Model (Shared Billing Account)
+export const Organization = sequelize.define('Organization', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  email: {
-    type: DataTypes.STRING,
-    unique: true,
-    allowNull: false
-  },
-  password: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  role: {
+  name: {
     type: DataTypes.STRING,
     allowNull: false,
-    defaultValue: 'admin' // admin, billing_manager, viewer
+    defaultValue: 'Shared Workspace'
   },
   plan: {
     type: DataTypes.STRING,
@@ -54,7 +45,6 @@ export const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: '2026-07-08'
   },
-  // Active/current usage values
   seats: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -77,7 +67,37 @@ export const User = sequelize.define('User', {
   }
 });
 
-// 2. Card Model (Credit Cards)
+// 2. User Model
+export const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  role: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'admin' // admin, billing_manager, viewer
+  }
+}, {
+  // Ensure that an email can only have one user record per role
+  indexes: [
+    {
+      unique: true,
+      fields: ['email', 'role']
+    }
+  ]
+});
+
+// 3. Card Model (Credit Cards - Linked to Organization)
 export const Card = sequelize.define('Card', {
   id: {
     type: DataTypes.STRING,
@@ -110,7 +130,7 @@ export const Card = sequelize.define('Card', {
   }
 });
 
-// 3. Invoice Model (Billing History)
+// 4. Invoice Model (Billing History - Linked to Organization)
 export const Invoice = sequelize.define('Invoice', {
   id: {
     type: DataTypes.STRING,
@@ -138,7 +158,7 @@ export const Invoice = sequelize.define('Invoice', {
   }
 });
 
-// 4. AuditLog Model (Simulator / Activity Feed)
+// 5. AuditLog Model (Linked to Organization & acting User)
 export const AuditLog = sequelize.define('AuditLog', {
   id: {
     type: DataTypes.INTEGER,
@@ -155,7 +175,7 @@ export const AuditLog = sequelize.define('AuditLog', {
   }
 });
 
-// 5. PlanLimit Model (Dynamic configuration settings editable by Admins)
+// 6. PlanLimit Model (Dynamic pricing configurations)
 export const PlanLimit = sequelize.define('PlanLimit', {
   planName: {
     type: DataTypes.STRING,
@@ -181,11 +201,17 @@ export const PlanLimit = sequelize.define('PlanLimit', {
 
 // --- RELATIONSHIPS ---
 
-User.hasMany(Card, { onDelete: 'CASCADE' });
-Card.belongsTo(User);
+Organization.hasMany(User, { onDelete: 'CASCADE' });
+User.belongsTo(Organization);
 
-User.hasMany(Invoice, { onDelete: 'CASCADE' });
-Invoice.belongsTo(User);
+Organization.hasMany(Card, { onDelete: 'CASCADE' });
+Card.belongsTo(Organization);
 
-User.hasMany(AuditLog, { onDelete: 'CASCADE' });
+Organization.hasMany(Invoice, { onDelete: 'CASCADE' });
+Invoice.belongsTo(Organization);
+
+Organization.hasMany(AuditLog, { onDelete: 'CASCADE' });
+AuditLog.belongsTo(Organization);
+
+User.hasMany(AuditLog, { onDelete: 'SET NULL' });
 AuditLog.belongsTo(User);

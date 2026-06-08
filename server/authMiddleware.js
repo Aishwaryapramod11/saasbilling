@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { User } from './db.js';
+import { User, Organization } from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'streamify_super_secret_session_token';
 
@@ -13,14 +13,17 @@ export const authMiddleware = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Fetch user details from database
-    const user = await User.findByPk(decoded.id);
+    // Fetch user details from database along with Organization
+    const user = await User.findByPk(decoded.id, {
+      include: [Organization]
+    });
     if (!user) {
       return res.status(401).json({ error: 'User session no longer exists.' });
     }
 
-    // Attach user information to request object
+    // Attach user and organization details to request object
     req.user = user;
+    req.organization = user.Organization;
     next();
   } catch (error) {
     console.error('Authentication Error:', error.message);

@@ -84,7 +84,7 @@ export default function Navbar() {
             <h1 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #fff, var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               Streamify Billing
             </h1>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Consumer Family Subscription</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{user?.organizationName || 'Consumer Family Subscription'}</p>
           </div>
         </div>
 

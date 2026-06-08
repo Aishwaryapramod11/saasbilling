@@ -191,7 +191,7 @@ export default function Login({ onLoginSuccess, onToggleView }) {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
-              onClick={() => handleQuickFill('admin@streamify.com', 'admin123')}
+              onClick={() => handleQuickFill('user@streamify.com', 'admin123')}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -208,11 +208,11 @@ export default function Login({ onLoginSuccess, onToggleView }) {
               }}
             >
               <span>🔑 Admin Profile</span>
-              <span style={{ fontSize: '10px', color: '#ff1e27', fontWeight: 'bold' }}>admin@streamify.com</span>
+              <span style={{ fontSize: '10px', color: '#ff1e27', fontWeight: 'bold' }}>user@streamify.com / admin123</span>
             </button>
 
             <button
-              onClick={() => handleQuickFill('manager@streamify.com', 'manager123')}
+              onClick={() => handleQuickFill('user@streamify.com', 'manager123')}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -229,11 +229,11 @@ export default function Login({ onLoginSuccess, onToggleView }) {
               }}
             >
               <span>💳 Billing Manager</span>
-              <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 'bold' }}>manager@streamify.com</span>
+              <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 'bold' }}>user@streamify.com / manager123</span>
             </button>
 
             <button
-              onClick={() => handleQuickFill('viewer@streamify.com', 'viewer123')}
+              onClick={() => handleQuickFill('user@streamify.com', 'viewer123')}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -250,7 +250,7 @@ export default function Login({ onLoginSuccess, onToggleView }) {
               }}
             >
               <span>🔒 Viewer (Read-Only)</span>
-              <span style={{ fontSize: '10px', color: '#a3a3a3', fontWeight: 'bold' }}>viewer@streamify.com</span>
+              <span style={{ fontSize: '10px', color: '#a3a3a3', fontWeight: 'bold' }}>user@streamify.com / viewer123</span>
             </button>
           </div>
         </div>
