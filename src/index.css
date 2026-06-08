@@ -1,0 +1,255 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* Colors */
+  --bg-dark: #07070a;
+  --bg-card: rgba(18, 18, 26, 0.55);
+  --bg-card-hover: rgba(26, 26, 36, 0.7);
+  --border-glass: rgba(255, 255, 255, 0.05);
+  --border-active: rgba(229, 9, 20, 0.35);
+  
+  --primary: #e50914; /* Netflix Red */
+  --primary-hover: #b80710;
+  --secondary: #f43f5e; /* Rose / Crimson */
+  --secondary-hover: #e11d48;
+  --success: #10b981; /* Emerald */
+  --warning: #f59e0b; /* Amber */
+  --danger: #ef4444; /* Rose */
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  
+  /* Glow Effects */
+  --indigo-glow: 0 0 20px rgba(229, 9, 20, 0.15);
+  --cyan-glow: 0 0 20px rgba(244, 63, 94, 0.15);
+  --rose-glow: 0 0 20px rgba(239, 68, 68, 0.15);
+  --active-glow: 0 0 25px rgba(229, 9, 20, 0.35);
+  
+  font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(229, 9, 20, 0.04) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(244, 63, 94, 0.03) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(13, 13, 20, 0.6) 0px, transparent 100%);
+  background-attachment: fixed;
+}
+
+/* Glassmorphism Panel styles */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(229, 9, 20, 0.2);
+  box-shadow: var(--indigo-glow);
+  transform: translateY(-2px);
+}
+
+/* Glass Buttons */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.glass-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.glass-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.glass-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: var(--indigo-glow);
+}
+
+.glass-btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: var(--active-glow);
+}
+
+.glass-btn-secondary {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  box-shadow: var(--cyan-glow);
+}
+
+.glass-btn-secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
+}
+
+.glass-btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #fda4af;
+}
+
+.glass-btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-primary);
+  box-shadow: var(--rose-glow);
+}
+
+/* Glass inputs */
+.glass-input {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.15);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.glass-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animations */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pulse-border {
+  animation: pulseBorder 2s infinite;
+}
+
+@keyframes pulseBorder {
+  0% {
+    border-color: rgba(229, 9, 20, 0.25);
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.1);
+  }
+  50% {
+    border-color: rgba(229, 9, 20, 0.6);
+    box-shadow: 0 0 20px rgba(229, 9, 20, 0.3);
+  }
+  100% {
+    border-color: rgba(229, 9, 20, 0.25);
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.1);
+  }
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(7, 7, 10, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Responsive Dashboard Layouts */
+.stats-grid, .sandbox-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  width: 100%;
+}
+
+.stats-card, .sandbox-card {
+  min-width: 0; /* Prevents Recharts / Flex items from overflowing */
+}
+
+@media (min-width: 992px) {
+  .stats-grid {
+    grid-template-columns: 5fr 7fr;
+  }
+  .sandbox-grid {
+    grid-template-columns: 5fr 7fr;
+  }
+}
+
+/* Print Invoice styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-invoice, .printable-invoice * {
+    visibility: visible;
+  }
+  .printable-invoice {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 20px !important;
+  }
+  .printable-invoice button, .printable-invoice .no-print {
+    display: none !important;
+  }
+}
+
