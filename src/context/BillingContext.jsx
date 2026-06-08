@@ -1,90 +1,160 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 
 export const BillingContext = createContext();
 
-const initialInvoices = [
-  { id: 'INV-1092', date: '2026-04-08', plan: 'Basic (Ads) Plan', amount: 5.99, status: 'Paid', method: 'Visa ending in 4242' },
-  { id: 'INV-2041', date: '2026-05-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242' },
-  { id: 'INV-3184', date: '2026-06-08', plan: 'Standard (HD) Plan', amount: 15.49, status: 'Paid', method: 'Visa ending in 4242' }
-];
-
 export const BillingProvider = ({ children }) => {
-  // 1. RBAC & Subscriptions
-  const [role, setRole] = useState(() => localStorage.getItem('role') || 'admin');
-  const [plan, setPlan] = useState(() => localStorage.getItem('plan') || 'Standard (HD)');
-  const [billingCycle, setBillingCycle] = useState(() => localStorage.getItem('billingCycle') || 'monthly');
-  const [subStatus, setSubStatus] = useState(() => localStorage.getItem('subStatus') || 'active');
-  const [trialEnds, setTrialEnds] = useState('2026-07-08');
-
-  // 2. Payment Methods
-  const [cards, setCards] = useState(() => {
-    const saved = localStorage.getItem('cards');
-    return saved ? JSON.parse(saved) : [
-      { id: 'c1', brand: 'Visa', last4: '4242', expMonth: 12, expYear: 2028, cardholder: 'Aishwarya R', isDefault: true }
-    ];
-  });
-
-  // 3. Usage & Metrics (streaming concurrent screens, downloaded episodes, hours watched)
-  const [usage, setUsage] = useState(() => {
-    const saved = localStorage.getItem('usage');
-    return saved ? JSON.parse(saved) : {
-      seats: 2,
-      downloads: 42,
-      hoursStreamed: 120
-    };
-  });
-
-  // Limits based on streaming plans (stateful so Admin can edit them dynamically)
-  const [planLimits, setPlanLimits] = useState(() => {
-    const saved = localStorage.getItem('planLimits');
-    return saved ? JSON.parse(saved) : {
-      'Basic (Ads)': { seats: 1, downloads: 0, resolution: '720p HD Quality', price: 5.99 },
-      'Standard (HD)': { seats: 2, downloads: 100, resolution: '1080p Full HD', price: 15.49 },
-      'Premium (4K)': { seats: 6, downloads: 1000, resolution: '4K Ultra HD + HDR', price: 22.99 }
-    };
-  });
-
-  const [yearlyDiscount, setYearlyDiscount] = useState(() => {
-    const saved = localStorage.getItem('yearlyDiscount');
-    return saved ? parseInt(saved) : 20;
-  });
-
-  // 4. Billing History & Audit Logs
-  const [invoices, setInvoices] = useState(() => {
-    const saved = localStorage.getItem('invoices');
-    return saved ? JSON.parse(saved) : initialInvoices;
-  });
+  const [token, setToken] = useState(() => localStorage.getItem('token') || null);
+  const [user, setUser] = useState(null);
   
-  const [logs, setLogs] = useState(() => {
-    const saved = localStorage.getItem('logs');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, time: new Date().toLocaleTimeString(), message: 'System: Streamify streaming workspace initialized.' },
-      { id: 2, time: new Date().toLocaleTimeString(), message: 'Streaming: Subscription plan active on Standard (HD) tier.' }
-    ];
+  // Derived state from user object
+  const [role, setRole] = useState('viewer');
+  const [plan, setPlanState] = useState('Basic (Ads)');
+  const [billingCycle, setBillingCycleState] = useState('monthly');
+  const [subStatus, setSubStatus] = useState('active');
+  const [trialEnds, setTrialEnds] = useState('2026-07-08');
+  const [usage, setUsage] = useState({ seats: 1, downloads: 0, hoursStreamed: 0 });
+  const [yearlyDiscount, setYearlyDiscountState] = useState(20);
+
+  // Lists loaded from API
+  const [cards, setCards] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [planLimits, setPlanLimits] = useState({
+    'Basic (Ads)': { seats: 1, downloads: 0, resolution: '720p HD Quality', price: 5.99 },
+    'Standard (HD)': { seats: 2, downloads: 100, resolution: '1080p Full HD', price: 15.49 },
+    'Premium (4K)': { seats: 6, downloads: 1000, resolution: '4K Ultra HD + HDR', price: 22.99 }
   });
 
-  // Synchronize states to localStorage
-  useEffect(() => { localStorage.setItem('role', role); }, [role]);
-  useEffect(() => { localStorage.setItem('plan', plan); }, [plan]);
-  useEffect(() => { localStorage.setItem('billingCycle', billingCycle); }, [billingCycle]);
-  useEffect(() => { localStorage.setItem('subStatus', subStatus); }, [subStatus]);
-  useEffect(() => { localStorage.setItem('cards', JSON.stringify(cards)); }, [cards]);
-  useEffect(() => { localStorage.setItem('usage', JSON.stringify(usage)); }, [usage]);
-  useEffect(() => { localStorage.setItem('planLimits', JSON.stringify(planLimits)); }, [planLimits]);
-  useEffect(() => { localStorage.setItem('yearlyDiscount', yearlyDiscount.toString()); }, [yearlyDiscount]);
-  useEffect(() => { localStorage.setItem('invoices', JSON.stringify(invoices)); }, [invoices]);
-  useEffect(() => { localStorage.setItem('logs', JSON.stringify(logs)); }, [logs]);
+  const [loading, setLoading] = useState(true);
 
-  // Helper to add audit logs
-  const addLog = (message) => {
-    setLogs(prev => [
-      { id: Date.now(), time: new Date().toLocaleTimeString(), message },
-      ...prev
-    ]);
+  // Helper: Get Request Headers
+  const getHeaders = useCallback(() => {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  }, [token]);
+
+  // --- API FETCHERS ---
+
+  const fetchLimits = useCallback(async () => {
+    try {
+      const response = await fetch('/api/billing/limits');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.planLimits) {
+          setPlanLimits(data.planLimits);
+        }
+      }
+    } catch (err) {
+      console.error('Fetch limits failed:', err);
+    }
+  }, []);
+
+  const fetchUserData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('/api/auth/me', { headers: getHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data);
+        setRole(data.role);
+        setPlanState(data.plan);
+        setBillingCycleState(data.billingCycle);
+        setSubStatus(data.subStatus);
+        setTrialEnds(data.trialEnds);
+        setUsage({
+          seats: data.seats,
+          downloads: data.downloads,
+          hoursStreamed: data.hoursStreamed
+        });
+        setYearlyDiscountState(data.yearlyDiscount);
+      } else {
+        // Token expired/invalid, clear session
+        logout();
+      }
+    } catch (err) {
+      console.error('Fetch user failed:', err);
+    }
+  }, [token, getHeaders]);
+
+  const fetchCards = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('/api/cards', { headers: getHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        setCards(data);
+      }
+    } catch (err) {
+      console.error('Fetch cards failed:', err);
+    }
+  }, [token, getHeaders]);
+
+  const fetchInvoices = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('/api/invoices', { headers: getHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        setInvoices(data);
+      }
+    } catch (err) {
+      console.error('Fetch invoices failed:', err);
+    }
+  }, [token, getHeaders]);
+
+  const fetchLogs = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('/api/logs', { headers: getHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(data);
+      }
+    } catch (err) {
+      console.error('Fetch logs failed:', err);
+    }
+  }, [token, getHeaders]);
+
+  // Load all user session data when token is available
+  useEffect(() => {
+    const loadSession = async () => {
+      setLoading(true);
+      await fetchLimits();
+      if (token) {
+        await fetchUserData();
+        await fetchCards();
+        await fetchInvoices();
+        await fetchLogs();
+      }
+      setLoading(false);
+    };
+    loadSession();
+  }, [token, fetchUserData, fetchCards, fetchInvoices, fetchLogs, fetchLimits]);
+
+  // Session controllers
+  const login = (jwtToken, userDetails) => {
+    localStorage.setItem('token', jwtToken);
+    setToken(jwtToken);
+    setUser(userDetails);
   };
 
-  // Calculate plan prices with discount
+  const logout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    setRole('viewer');
+    setCards([]);
+    setInvoices([]);
+    setLogs([]);
+  };
+
+  // --- BILLING / PLAN LOGIC ---
+
+  // Get plan price after applying discount (if yearly)
   const getPlanPrice = (planName, cycle = billingCycle) => {
+    if (!planLimits[planName]) return 0;
     const base = planLimits[planName].price;
     if (cycle === 'yearly') {
       return +(base * (1 - yearlyDiscount / 100)).toFixed(2);
@@ -92,213 +162,256 @@ export const BillingProvider = ({ children }) => {
     return base;
   };
 
-  // Pro-ration calculation: upgrade/downgrade mid-cycle
+  // Calculate real-time proration based on current plan prices
   const calculateProration = (targetPlan) => {
     if (plan === targetPlan) return { total: 0, credit: 0, newCharge: 0 };
-    
-    // Simulate day 15 of a 30-day billing cycle (50% remaining)
-    const ratioRemaining = 0.50; 
+    const ratioRemaining = 0.50; // Day 15 of 30
     const currentPrice = getPlanPrice(plan);
     const newPrice = getPlanPrice(targetPlan);
-    
     const credit = +(currentPrice * ratioRemaining).toFixed(2);
     const newCharge = +(newPrice * ratioRemaining).toFixed(2);
     const total = +(newCharge - credit).toFixed(2);
-
-    return {
-      credit,
-      newCharge,
-      total,
-      daysRemaining: 15
-    };
+    return { credit, newCharge, total, daysRemaining: 15 };
   };
 
-  // Switch Plan with Pro-ration invoice injection
-  const changePlan = (newPlan) => {
-    console.log("BillingContext: changePlan triggered for plan:", newPlan, "Active role:", role);
-    if (role === 'viewer') {
-      console.warn("BillingContext: Rejected plan change because role is viewer");
-      addLog(`Error: Viewer profile tried to modify subscription to ${newPlan}. Blocked.`);
-      return { success: false, error: 'Access Denied: Read-only profile.' };
-    }
+  // Submit checkout/switch request to backend
+  const changePlan = async (newPlan, targetCycle = billingCycle) => {
+    try {
+      const response = await fetch('/api/billing/plan', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ newPlan, cycle: targetCycle })
+      });
 
-    const { total, credit, newCharge } = calculateProration(newPlan);
-    console.log("BillingContext: Proration calculated:", { total, credit, newCharge });
-    const oldPlan = plan;
-    setPlan(newPlan);
-    setSubStatus('active');
-    console.log("BillingContext: plan state successfully set to:", newPlan);
-
-    // Create a pro-rated invoice if there's a charge
-    if (total !== 0) {
-      const invoiceId = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newInvoice = {
-        id: invoiceId,
-        date: new Date().toISOString().split('T')[0],
-        plan: `Subscription Update: ${oldPlan} ➔ ${newPlan} (Pro-rated)`,
-        amount: Math.abs(total),
-        status: total > 0 ? 'Paid' : 'Refunded',
-        method: (() => {
-          const defaultCard = cards.find(c => c.isDefault);
-          return defaultCard ? `${defaultCard.brand} ending in ${defaultCard.last4}` : 'System Credit';
-        })()
-      };
-      setInvoices(prev => [newInvoice, ...prev]);
-      addLog(`Streaming: Upgraded subscription from ${oldPlan} to ${newPlan}. Pro-rated charge: ₹${total}.`);
-    } else {
-      addLog(`Streaming: Shifted subscription to ${newPlan}. No adjustments.`);
-    }
-
-    // Auto-adjust active screens if they exceed new limits
-    const limits = planLimits[newPlan];
-    setUsage(prev => ({
-      ...prev,
-      seats: Math.min(prev.seats, limits.seats),
-      downloads: Math.min(prev.downloads, limits.downloads)
-    }));
-
-    return { success: true };
-  };
-
-  // Add Credit Card
-  const addCard = (cardDetails) => {
-    if (role === 'viewer') return { success: false, error: 'Access Denied.' };
-    
-    const newCard = {
-      id: `c-${Date.now()}`,
-      brand: cardDetails.brand || 'Visa',
-      last4: cardDetails.number.slice(-4),
-      expMonth: parseInt(cardDetails.expMonth),
-      expYear: parseInt(cardDetails.expYear),
-      cardholder: cardDetails.cardholder || 'Cardholder',
-      isDefault: cards.length === 0
-    };
-    
-    setCards(prev => {
-      const updated = cardDetails.isDefault 
-        ? prev.map(c => ({ ...c, isDefault: false })).concat(newCard)
-        : prev.concat(newCard);
-      return updated;
-    });
-
-    addLog(`CardManager: Added new ${newCard.brand} ending in ${newCard.last4} as default.`);
-    return { success: true };
-  };
-
-  const deleteCard = (id) => {
-    if (role === 'viewer') return { success: false };
-    const cardToDelete = cards.find(c => c.id === id);
-    if (!cardToDelete) return { success: false };
-
-    setCards(prev => {
-      const filtered = prev.filter(c => c.id !== id);
-      if (cardToDelete.isDefault && filtered.length > 0) {
-        filtered[0].isDefault = true;
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Plan change failed.' };
       }
-      return filtered;
-    });
 
-    addLog(`CardManager: Removed payment method ${cardToDelete.brand} ending in ${cardToDelete.last4}.`);
-    return { success: true };
+      await fetchUserData();
+      await fetchInvoices();
+      await fetchLogs();
+      return { success: true };
+    } catch (err) {
+      console.error('Change plan request failed:', err);
+      return { success: false, error: 'Network communication failure.' };
+    }
   };
 
-  const setDefaultCard = (id) => {
-    if (role === 'viewer') return { success: false };
-    setCards(prev => prev.map(c => ({
-      ...c,
-      isDefault: c.id === id
-    })));
-    const activeCard = cards.find(c => c.id === id);
-    addLog(`CardManager: Changed billing card to ${activeCard?.brand} ending in ${activeCard?.last4}.`);
-    return { success: true };
+  // Switch billing cycle (updates state via server plan endpoint)
+  const setBillingCycle = async (newCycle) => {
+    await changePlan(plan, newCycle);
+  };
+
+  // Admin-only: Save modified master pricing limits
+  const savePlanLimits = async (updatedLimits, discountRate) => {
+    try {
+      const response = await fetch('/api/billing/limits', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          planLimits: updatedLimits,
+          yearlyDiscount: discountRate
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to update plan configurations.' };
+      }
+
+      await fetchLimits();
+      await fetchUserData();
+      await fetchLogs();
+      return { success: true };
+    } catch (err) {
+      console.error('Save limits failed:', err);
+      return { success: false, error: 'Network communication failure.' };
+    }
+  };
+
+  // --- CARDS CRUD ---
+
+  const addCard = async (cardDetails) => {
+    try {
+      const response = await fetch('/api/cards', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(cardDetails)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to save card.' };
+      }
+
+      await fetchCards();
+      await fetchLogs();
+      return { success: true };
+    } catch (err) {
+      console.error('Add card failed:', err);
+      return { success: false, error: 'Network communication failure.' };
+    }
+  };
+
+  const deleteCard = async (id) => {
+    try {
+      const response = await fetch(`/api/cards/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return { success: false, error: data.error || 'Failed to delete card.' };
+      }
+
+      await fetchCards();
+      await fetchLogs();
+      return { success: true };
+    } catch (err) {
+      console.error('Delete card failed:', err);
+      return { success: false };
+    }
+  };
+
+  const setDefaultCard = async (id) => {
+    try {
+      const response = await fetch(`/api/cards/${id}/default`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return { success: false, error: data.error || 'Failed to set default card.' };
+      }
+
+      await fetchCards();
+      await fetchLogs();
+      return { success: true };
+    } catch (err) {
+      console.error('Set default card failed:', err);
+      return { success: false };
+    }
   };
 
   // --- SANDBOX SIMULATORS ---
-  const simulatePaymentFailure = () => {
-    setSubStatus('past_due');
-    const invoiceId = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-    const failedInvoice = {
-      id: invoiceId,
-      date: new Date().toISOString().split('T')[0],
-      plan: `${plan} Subscription Renewal (Failed)`,
-      amount: getPlanPrice(plan),
-      status: 'Failed',
-      method: (() => {
-        const defaultCard = cards.find(c => c.isDefault);
-        return defaultCard ? `${defaultCard.brand} ending in ${defaultCard.last4}` : 'No Card';
-      })()
-    };
-    setInvoices(prev => [failedInvoice, ...prev]);
-    addLog(`Sandbox: Subscription charge of ₹${getPlanPrice(plan)} failed. Access state set to Past Due.`);
-  };
 
-  const simulateUsageSpike = (enable = true) => {
-    if (enable) {
-      setUsage({
-        seats: 4, // Exceeds Standard (HD) limit of 2 screens!
-        downloads: 125, // Exceeds Standard (HD) limit of 100!
-        hoursStreamed: 245
+  const simulatePaymentFailure = async () => {
+    try {
+      const response = await fetch('/api/sandbox/decline', {
+        method: 'POST',
+        headers: getHeaders()
       });
-      addLog('Sandbox: Simulated stream overage spike. Active screens exceeded maximum concurrent capacity.');
-    } else {
-      setUsage({
-        seats: 2,
-        downloads: 42,
-        hoursStreamed: 120
-      });
-      addLog('Sandbox: Reset streaming usage metrics to normal.');
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      await fetchUserData();
+      await fetchInvoices();
+      await fetchLogs();
+    } catch (err) {
+      console.error('Simulate payment failure failed:', err);
     }
   };
 
-  const triggerCardExpiry = (enable = true) => {
-    setCards(prev => prev.map(c => {
-      if (c.isDefault) {
-        return {
-          ...c,
-          expMonth: enable ? new Date().getMonth() + 1 : 12,
-          expYear: enable ? new Date().getFullYear() : 2028
-        };
+  const simulateUsageSpike = async (enable = true) => {
+    try {
+      const response = await fetch('/api/sandbox/spike', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ enable })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Error: ${data.error}`);
+        return;
       }
-      return c;
-    }));
-    addLog(enable ? 'Sandbox: Set card expiration warning header active.' : 'Sandbox: Reset card expiration warnings.');
+
+      await fetchUserData();
+      await fetchLogs();
+    } catch (err) {
+      console.error('Simulate usage spike failed:', err);
+    }
   };
 
-  const clearLogs = () => {
-    setLogs([]);
+  const triggerCardExpiry = async (enable = true) => {
+    try {
+      const response = await fetch('/api/sandbox/expiry', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ enable })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      await fetchCards();
+      await fetchLogs();
+    } catch (err) {
+      console.error('Simulate card expiry failed:', err);
+    }
+  };
+
+  const clearLogs = async () => {
+    try {
+      const response = await fetch('/api/logs', {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      await fetchLogs();
+    } catch (err) {
+      console.error('Clear logs failed:', err);
+    }
   };
 
   return (
     <BillingContext.Provider
       value={{
+        token,
+        login,
+        logout,
+        user,
         role,
-        setRole,
         plan,
         setPlan: changePlan,
         billingCycle,
         setBillingCycle,
         subStatus,
-        setSubStatus,
         trialEnds,
+        usage,
         cards,
         addCard,
         deleteCard,
         setDefaultCard,
-        usage,
-        setUsage,
         planLimits,
-        setPlanLimits,
+        setPlanLimits: savePlanLimits, // binds admin limits modification
         yearlyDiscount,
-        setYearlyDiscount,
+        setYearlyDiscount: (d) => savePlanLimits(planLimits, d),
         invoices,
         logs,
-        addLog,
         calculateProration,
         getPlanPrice,
         simulatePaymentFailure,
         simulateUsageSpike,
         triggerCardExpiry,
-        clearLogs
+        clearLogs,
+        loading
       }}
     >
       {children}

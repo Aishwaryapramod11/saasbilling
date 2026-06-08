@@ -1,13 +1,70 @@
-import React from 'react';
-import { BillingProvider } from './context/BillingContext';
+import React, { useContext, useState } from 'react';
+import { BillingProvider, BillingContext } from './context/BillingContext';
 import Navbar from './components/Navbar';
 import DashboardStats from './components/DashboardStats';
 import PlanPricing from './components/PlanPricing';
 import CardManager from './components/CardManager';
 import InvoiceReceipt from './components/InvoiceReceipt';
 import SandboxConsole from './components/SandboxConsole';
+import Login from './components/Login';
+import Register from './components/Register';
 
 function AppContent() {
+  const { token, login, loading } = useContext(BillingContext);
+  const [authView, setAuthView] = useState('login'); // 'login' or 'register'
+
+  // 1. Loading State
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'radial-gradient(circle at center, #1b0a0a 0%, #0c0404 100%)',
+        gap: '20px',
+        color: '#fff'
+      }}>
+        <div style={{
+          width: '50px',
+          height: '50px',
+          borderRadius: '50%',
+          border: '4px solid rgba(229, 9, 20, 0.1)',
+          borderTopColor: '#e50914',
+          animation: 'spin 1s linear infinite'
+        }} className="spinner-loader" />
+        <span style={{ fontSize: '14px', letterSpacing: '1px', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+          Syncing Session data...
+        </span>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // 2. Authentication Gate
+  if (!token) {
+    if (authView === 'register') {
+      return (
+        <Register
+          onRegisterSuccess={(jwtToken, user) => login(jwtToken, user)}
+          onToggleView={() => setAuthView('login')}
+        />
+      );
+    }
+    return (
+      <Login
+        onLoginSuccess={(jwtToken, user) => login(jwtToken, user)}
+        onToggleView={() => setAuthView('register')}
+      />
+    );
+  }
+
+  // 3. Full Dashboard View
   return (
     <div style={{
       minHeight: '100vh',
@@ -15,12 +72,12 @@ function AppContent() {
       flexDirection: 'column',
       gap: '24px',
       paddingBottom: '60px'
-    }} className="animate-fade-in no-print">
+    }}>
       
-      {/* 1. Global Navigation */}
+      {/* Global Navigation */}
       <Navbar />
 
-      {/* 2. Main Dashboard Area */}
+      {/* Main Dashboard Area */}
       <div style={{
         maxWidth: '1280px',
         width: '100%',
@@ -29,7 +86,7 @@ function AppContent() {
         display: 'flex',
         flexDirection: 'column',
         gap: '30px'
-      }}>
+      }} className="animate-fade-in no-print">
         
         {/* Section A: Pricing Tiers & Subscription Selection */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
